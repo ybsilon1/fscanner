@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# uv / venv
+.venv/
+.python-version
+
+# Build
+dist/
+*.egg-info/
+
+# Secrets
+.env
+*.env
+
+# Generated output (written by scanner at runtime)
+docs/chart_*.png
+docs/status.json
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+*.swp
