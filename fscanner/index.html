@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Forex Scanner Dashboard</title>
+<style>
+  :root{--bg:#0d1117;--bg2:#161b22;--bg3:#1f2937;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--green:#26a69a;--red:#ef5350;--amber:#e67e22;--blue:#378add;--cyan:#00e5ff;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;font-size:13px;}
+  header{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;justify-content:space-between;align-items:center;}
+  header h1{font-size:16px;font-weight:600;letter-spacing:.05em;color:var(--cyan);}
+  #updated{color:var(--muted);font-size:11px;}
+  .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;padding:20px 24px 0;}
+  .stat{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;}
+  .stat .label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
+  .stat .value{font-size:22px;font-weight:700;}
+  .value.green{color:var(--green);}.value.amber{color:var(--amber);}.value.muted{color:var(--muted);}
+  section{padding:20px 24px;}
+  section h2{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;}
+  .candidates{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+  .card{background:var(--bg2);border:1px solid var(--amber);border-radius:10px;padding:16px;}
+  .card .symbol{font-size:18px;font-weight:700;color:var(--cyan);margin-bottom:8px;}
+  .card .row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);font-size:11px;}
+  .card .row:last-of-type{border-bottom:none;}
+  .card .row .k{color:var(--muted);}.card .row .v{color:var(--text);}
+  .card .pct-bar{height:4px;background:var(--bg3);border-radius:2px;margin:10px 0 6px;}
+  .card .pct-fill{height:4px;background:var(--amber);border-radius:2px;}
+  .card img{width:100%;border-radius:6px;margin-top:10px;border:1px solid var(--border);cursor:pointer;}
+  .all-table{width:100%;border-collapse:collapse;font-size:11px;}
+  .all-table th{color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);font-weight:400;font-size:10px;text-transform:uppercase;}
+  .all-table td{padding:5px 8px;border-bottom:1px solid var(--border);}
+  .all-table tr:hover td{background:var(--bg2);}
+  .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;}
+  .badge.yes{background:rgba(230,126,34,.2);color:var(--amber);border:1px solid var(--amber);}
+  .badge.no{background:transparent;color:var(--muted);border:1px solid var(--border);}
+  .badge.err{background:rgba(239,83,80,.15);color:var(--red);border:1px solid var(--red);}
+  #modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;align-items:center;justify-content:center;}
+  #modal.open{display:flex;}
+  #modal img{max-width:92vw;max-height:88vh;border-radius:8px;}
+  #modal-close{position:absolute;top:16px;right:20px;color:#fff;font-size:28px;cursor:pointer;}
+  .no-cand{color:var(--muted);font-size:13px;padding:20px 0;}
+  footer{padding:20px 24px;color:var(--muted);font-size:10px;text-align:center;border-top:1px solid var(--border);}
+</style>
+</head>
+<body>
+<header>
+  <h1>Forex Scanner</h1>
+  <div id="updated">loading…</div>
+</header>
+<div class="summary">
+  <div class="stat"><div class="label">Candidates</div><div class="value green" id="s-cand">—</div></div>
+  <div class="stat"><div class="label">Scanned</div><div class="value muted" id="s-scan">—</div></div>
+  <div class="stat"><div class="label">Last run</div><div class="value muted" id="s-time" style="font-size:13px;padding-top:4px;">—</div></div>
+  <div class="stat"><div class="label">Errors</div><div class="value amber" id="s-err">—</div></div>
+</div>
+<section>
+  <h2>Candidates</h2>
+  <div class="candidates" id="cand-grid"><p class="no-cand">Loading…</p></div>
+</section>
+<section>
+  <h2>All pairs</h2>
+  <table class="all-table">
+    <thead><tr><th>Pair</th><th>Price</th><th>% from D1 low</th><th>Hot zone</th><th>Pattern</th><th>Status</th></tr></thead>
+    <tbody id="all-tbody"></tbody>
+  </table>
+</section>
+<footer>Refreshes every 5 min · Twelve Data · Telegram alerts · GitHub Pages</footer>
+<div id="modal" onclick="closeModal()">
+  <span id="modal-close">&times;</span>
+  <img id="modal-img" src="" alt="chart"/>
+</div>
+<script>
+function fmt(v,d=5){return v!=null?Number(v).toFixed(d):"—";}
+function ago(iso){const s=Math.floor((Date.now()-new Date(iso))/1000);if(s<60)return s+"s ago";if(s<3600)return Math.floor(s/60)+"m ago";return Math.floor(s/3600)+"h ago";}
+function openModal(src){document.getElementById("modal-img").src=src;document.getElementById("modal").classList.add("open");}
+function closeModal(){document.getElementById("modal").classList.remove("open");}
+async function load(){
+  let data;
+  try{const r=await fetch("status.json?t="+Date.now());data=await r.json();}
+  catch(e){document.getElementById("updated").textContent="Could not load status.json";return;}
+  document.getElementById("updated").textContent="Updated "+ago(data.updated);
+  document.getElementById("s-cand").textContent=data.candidates.length;
+  document.getElementById("s-scan").textContent=data.scanned;
+  document.getElementById("s-time").textContent=data.updated.slice(11,16)+" UTC";
+  document.getElementById("s-err").textContent=data.all.filter(r=>r.error).length;
+  const grid=document.getElementById("cand-grid");
+  if(!data.candidates.length){grid.innerHTML='<p class="no-cand">No candidates in this scan.</p>';}
+  else{grid.innerHTML=data.candidates.map(c=>{
+    const rng=c.d1.high-c.d1.low,zt=(c.d1.low+rng*.20).toFixed(5),pct=c.pct_from_low;
+    const cf="chart_"+c.symbol.replace("/","")+".png";
+    return`<div class="card">
+      <div class="symbol">${c.symbol}</div>
+      <div class="pct-bar"><div class="pct-fill" style="width:${Math.min(pct,100)}%"></div></div>
+      <div style="font-size:10px;color:var(--amber);margin-bottom:8px;">${pct.toFixed(1)}% from D1 low</div>
+      <div class="row"><span class="k">D1 high</span><span class="v">${fmt(c.d1.high)}</span></div>
+      <div class="row"><span class="k">Zone top (20%)</span><span class="v">${zt}</span></div>
+      <div class="row"><span class="k">D1 low</span><span class="v">${fmt(c.d1.low)}</span></div>
+      <div class="row"><span class="k">Current price</span><span class="v" style="color:var(--cyan)">${fmt(c.price)}</span></div>
+      <div class="row"><span class="k">M20 pattern</span><span class="v">${c.pattern.streak_len} red + lower wick → green</span></div>
+      <img src="${cf}" alt="${c.symbol}" onclick="openModal('${cf}')"/>
+    </div>`;}).join("");}
+  const tbody=document.getElementById("all-tbody");
+  tbody.innerHTML=data.all.map(r=>{
+    if(r.error)return`<tr><td style="font-weight:600">${r.symbol}</td><td colspan="4" style="color:var(--muted)">${r.error}</td><td><span class="badge err">error</span></td></tr>`;
+    const inZ=r.pct_from_low!=null&&r.pct_from_low<=20;
+    return`<tr>
+      <td style="font-weight:600;color:${r.candidate?"var(--cyan)":"var(--text)"}">${r.symbol}</td>
+      <td>${r.price?fmt(r.price):"—"}</td>
+      <td style="color:${inZ?"var(--amber)":"var(--muted)"}">${r.pct_from_low!=null?r.pct_from_low.toFixed(1)+"%":"—"}</td>
+      <td>${inZ?'<span style="color:var(--amber)">in zone</span>':'<span style="color:var(--muted)">—</span>'}</td>
+      <td>${r.pattern?`<span class="badge yes">${r.pattern.streak_len}R+G</span>`:'<span class="badge no">none</span>'}</td>
+      <td>${r.candidate?'<span class="badge yes">candidate</span>':'<span class="badge no">no match</span>'}</td>
+    </tr>`;}).join("");
+}
+load();setInterval(load,5*60*1000);
+</script>
+</body>
+</html>
