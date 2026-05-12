@@ -6,11 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  qa:
-    uses: ./.github/workflows/qa.yml
-
   scan:
-    needs: qa
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -30,10 +26,10 @@ jobs:
           fi
 
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout wiki
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ github.repository }}.wiki
           path: wiki
