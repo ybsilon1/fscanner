@@ -20,6 +20,9 @@ dist/
 docs/chart_*.png
 docs/status.json
 
+# Local wiki clone (CI checks out the real GitHub wiki here)
+wiki/
+
 # macOS
 .DS_Store
 
