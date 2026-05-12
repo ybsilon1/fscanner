@@ -1,0 +1,56 @@
+name: Forex Scanner
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+
+    env:
+      TWELVE_DATA_KEY:  ${{ secrets.TWELVE_DATA_KEY }}
+      TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+    steps:
+      - name: Validate secrets
+        run: |
+          if [ -z "$TWELVE_DATA_KEY" ]; then
+            echo "::error::TWELVE_DATA_KEY secret is not set. Go to Settings → Secrets and variables → Actions and add it."
+            exit 1
+          fi
+
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Checkout wiki
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki
+        # Wiki repo is created lazily by GitHub — skip on first push
+        continue-on-error: true
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run scanner
+        run: uv run fscanner
+
+      - name: Commit wiki
+        if: hashFiles('wiki') != ''
+        uses: ./.github/actions/git-push
+        with:
+          message: "scan"
+          working-directory: wiki

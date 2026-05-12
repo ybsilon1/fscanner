@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# uv / venv
+.venv/
+.python-version
+
+# Build
+dist/
+*.egg-info/
+
+# Secrets
+.env
+*.env
+
+# Local wiki clone (CI checks out the real GitHub wiki here)
+wiki/
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+*.swp

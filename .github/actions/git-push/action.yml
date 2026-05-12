@@ -1,0 +1,24 @@
+name: Git commit and push
+description: Stage all changes, commit with a timestamped message, and push.
+
+inputs:
+  message:
+    description: Commit message prefix
+    required: false
+    default: "scan"
+  working-directory:
+    description: Directory to run git commands in
+    required: false
+    default: "."
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        git config user.name  "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add .
+        git diff --staged --quiet || git commit -m "${{ inputs.message }}: $(date -u +'%Y-%m-%d %H:%M UTC')"
+        git push
