@@ -112,7 +112,7 @@ PAIRS = [
 # ── Twelve Data helpers ────────────────────────────────────────────────────────
 
 
-def api_get(endpoint: str, params: dict) -> dict:
+def api_get(endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
     global _next_call_allowed
     params["apikey"] = TWELVE_DATA_KEY
     for attempt in range(3):
@@ -133,12 +133,13 @@ def api_get(endpoint: str, params: dict) -> dict:
         except Exception as e:
             print(f"  API error (attempt {attempt + 1}): {e}")
             time.sleep(15)
+    print(f"  {endpoint} failed after 3 attempts — skipping")
     return {}
 
 
-def _parse_candle(c: dict) -> dict:
+def _parse_candle(c: dict) -> dict[str, Any]:
     return {
-        "date": c["datetime"],
+        "datetime": c["datetime"],
         "open": float(c["open"]),
         "high": float(c["high"]),
         "low": float(c["low"]),
@@ -195,7 +196,7 @@ def has_lower_wick(c: dict, min_wick_pct: float = 0.1) -> bool:
     return wick / candle_range >= min_wick_pct
 
 
-def find_pattern(m20: list[dict]) -> dict | None:
+def find_pattern(m20: list[dict[str, Any]]) -> dict[str, Any] | None:
     """Scan for: green candle preceded by 3–5 red candles, last red has lower wick.
 
     Checks longest streak first (5 → 3) so the strongest signal is preferred.
@@ -277,7 +278,7 @@ def generate_chart(
     ax1.tick_params(colors="#888", labelsize=7)
     ax1.yaxis.tick_right()
     ax1.set_title(
-        f"{symbol}  ·  D1 ({d1['date']})  ·  price at {pct:.1f}% from low",
+        f"{symbol}  ·  D1 ({d1['datetime']})  ·  price at {pct:.1f}% from low",
         color="#cccccc",
         fontsize=9,
         pad=6,
@@ -390,7 +391,7 @@ def send_telegram_alert(
 
     caption = (
         f"*CANDIDATE: {symbol}*\n\n"
-        f"D1 levels ({d1['date']})\n"
+        f"D1 levels ({d1['datetime']})\n"
         f"  H  `{d1['high']:.5f}`\n"
         f"  20% `{zone_top:.5f}`  ← zone top\n"
         f"  L  `{d1['low']:.5f}`\n\n"
@@ -596,7 +597,7 @@ def main():
                     symbol, result["d1"], pattern, result["price"], result["pct_from_low"], chart
                 )
 
-    # ── Step 4: save outputs ──────────────────────────────────────────────────
+    # ── Step 3: save outputs ─────────────────────────────────────────────────
     print()
     save_wiki(results, run_dt)
 
