@@ -34,10 +34,7 @@ import matplotlib.pyplot as plt
 _REPO_ROOT = Path(__file__).parent.parent
 _TEMPLATES = Path(__file__).parent / "templates"
 
-# Free tier: 8 credits/min; each symbol in a batch = 1 credit.
-# _BATCH_SIZE symbols per call → 1 call per minute.
-_BATCH_SIZE = 8
-_MINUTE = 62.0  # slightly over 60s to avoid edge-of-window rejections
+_CALL_INTERVAL = 8.0  # free tier: 8 credits/min → 1 call per 8s
 _next_call_allowed: float = 0.0  # monotonic timestamp; 0 means "immediately"
 
 TWELVE_DATA_KEY = None
@@ -56,13 +53,12 @@ def _require_env(name: str) -> str:
     return val
 
 
-# ── All 50 pairs ───────────────────────────────────────────────────────────────
+# ── Pairs ──────────────────────────────────────────────────────────────────────
 PAIRS = [
     # BIS Top 15 (hard figures, April 2025)
     "EUR/USD",
     "USD/JPY",
     "GBP/USD",
-    "USD/CNY",
     "USD/AUD",
     "USD/CAD",
     "USD/CHF",
@@ -125,7 +121,7 @@ def api_get(endpoint: str, params: dict) -> dict:
             print(f"  rate-limit: waiting {wait:.0f}s...")
             time.sleep(wait)
         try:
-            _next_call_allowed = time.monotonic() + _MINUTE
+            _next_call_allowed = time.monotonic() + _CALL_INTERVAL
             r = requests.get(f"https://api.twelvedata.com/{endpoint}", params=params, timeout=30)
             r.raise_for_status()
             data = r.json()
@@ -150,86 +146,22 @@ def _parse_candle(c: dict) -> dict:
     }
 
 
-def _parse_d1_response(data: dict, symbols: list[str]) -> dict[str, tuple[dict, float] | None]:
-    if not data or data.get("status") == "error":
-        return {sym: None for sym in symbols}
-    results: dict[str, tuple[dict, float] | None] = {}
-    if "values" in data:
-        # Single-symbol response is flat {"values": [...]}
-        sym = symbols[0]
-        values = data.get("values", [])
-        results[sym] = (
-            (_parse_candle(values[1]), float(values[0]["close"])) if len(values) >= 2 else None
-        )
-    else:
-        # Multi-symbol response is {"EUR/USD": {"values": [...]}, ...}
-        for sym in symbols:
-            entry = data.get(sym, {})
-            if entry.get("status") == "error" or "values" not in entry:
-                results[sym] = None
-            else:
-                values = entry["values"]
-                results[sym] = (
-                    (_parse_candle(values[1]), float(values[0]["close"]))
-                    if len(values) >= 2
-                    else None
-                )
-    return results
+def get_d1(symbol: str) -> tuple[dict, float] | None:
+    """Fetch yesterday's completed D1 candle and today's current price for one symbol."""
+    data = api_get("time_series", {"symbol": symbol, "interval": "1day", "outputsize": 2})
+    if data.get("status") == "error" or "values" not in data:
+        return None
+    values = data["values"]
+    return (_parse_candle(values[1]), float(values[0]["close"])) if len(values) >= 2 else None
 
 
-def get_d1_batch(symbols: list[str]) -> dict[str, tuple[dict, float] | None]:
-    """Fetch D1 data in chunks of _BATCH_SIZE (free tier: 8 credits/min per chunk).
-
-    Returns {symbol: (d1_candle, current_price) | None}.
-    """
-    results: dict[str, tuple[dict, float] | None] = {}
-    chunks = [symbols[i : i + _BATCH_SIZE] for i in range(0, len(symbols), _BATCH_SIZE)]
-    for chunk in chunks:
-        data = api_get(
-            "time_series",
-            {"symbol": ",".join(chunk), "interval": "1day", "outputsize": 2},
-        )
-        results.update(_parse_d1_response(data, chunk))
-    return results
-
-
-def _parse_m20_response(data: dict, symbols: list[str], count: int) -> dict[str, list[dict] | None]:
-    results: dict[str, list[dict] | None] = {}
-    if not data or data.get("status") == "error":
-        return {sym: None for sym in symbols}
-    if "values" in data:
-        sym = symbols[0]
-        raw = data.get("values", [])
-        results[sym] = [_parse_candle(c) for c in reversed(raw[1:])] if len(raw) >= 2 else None
-    else:
-        for sym in symbols:
-            entry = data.get(sym, {})
-            if entry.get("status") == "error" or "values" not in entry:
-                results[sym] = None
-            else:
-                raw = entry["values"]
-                results[sym] = (
-                    [_parse_candle(c) for c in reversed(raw[1:])] if len(raw) >= 2 else None
-                )
-    return results
-
-
-def get_m20_batch(symbols: list[str], count: int = 12) -> dict[str, list[dict] | None]:
-    """Fetch M20 candles in chunks of _BATCH_SIZE.
-
-    Returns {symbol: [candles oldest→newest] | None}.
-    """
-    if not symbols:
-        return {}
-    results: dict[str, list[dict] | None] = {}
-    chunks = [symbols[i : i + _BATCH_SIZE] for i in range(0, len(symbols), _BATCH_SIZE)]
-    for chunk in chunks:
-        data = api_get(
-            "time_series",
-            {"symbol": ",".join(chunk), "interval": "20min", "outputsize": count + 1},
-        )
-        results.update(_parse_m20_response(data, chunk, count))
-    return results
+def get_m20(symbol: str, count: int = 12) -> list[dict] | None:
+    """Fetch the last `count` completed M20 candles for one symbol."""
+    data = api_get("time_series", {"symbol": symbol, "interval": "20min", "outputsize": count + 1})
+    if data.get("status") == "error" or "values" not in data:
+        return None
+    raw = data["values"]
+    return [_parse_candle(c) for c in reversed(raw[1:])] if len(raw) >= 2 else None
 
 
 # ── Signal detection ───────────────────────────────────────────────────────────
@@ -594,19 +526,14 @@ def main():
     run_dt = datetime.datetime.now(datetime.UTC)
     print(f"=== Forex Scanner  {run_dt.strftime('%Y-%m-%d %H:%M UTC')} ===")
 
-    # ── Step 1: fetch all D1 data in chunks of _BATCH_SIZE ───────────────────
-    n_chunks = -(-len(PAIRS) // _BATCH_SIZE)  # ceiling division
-    print(f"\nFetching D1 data for {len(PAIRS)} pairs ({n_chunks} API calls)...")
-    d1_batch = get_d1_batch(PAIRS)
-
-    # ── Step 2: hot zone filter ───────────────────────────────────────────────
+    # ── Step 1: fetch D1 for each pair individually ───────────────────────────
+    print(f"\nFetching D1 data for {len(PAIRS)} pairs...")
     results: list[dict[str, Any]] = []
     in_zone_symbols: list[str] = []
 
-    print()
     for symbol in PAIRS:
         result: dict[str, Any] = {"symbol": symbol, "candidate": False, "error": None}
-        pair_data = d1_batch.get(symbol)
+        pair_data = get_d1(symbol)
 
         if pair_data is None:
             result["error"] = "no D1 data"
@@ -633,23 +560,18 @@ def main():
         else:
             print(f"  {symbol:<12} price={price:.5f}  hot zone {zone_label}  — {pct:.1f}% from low")
 
-    # ── Step 3: fetch M20 only for pairs in the hot zone ─────────────────────
+    # ── Step 2: fetch M20 only for pairs in the hot zone ─────────────────────
     if not in_zone_symbols:
         print("\nNo pairs in hot zone — skipping M20 fetch.")
     else:
-        n_m20_chunks = -(-len(in_zone_symbols) // _BATCH_SIZE)
-        print(
-            f"\nFetching M20 data for {len(in_zone_symbols)} pair(s) in zone"
-            f" ({n_m20_chunks} API call(s))..."
-        )
-        m20_batch = get_m20_batch(in_zone_symbols)
+        print(f"\nFetching M20 data for {len(in_zone_symbols)} pair(s) in zone...")
 
         for result in results:
             symbol = result["symbol"]
             if symbol not in in_zone_symbols:
                 continue
 
-            m20 = m20_batch.get(symbol)
+            m20 = get_m20(symbol)
             if not m20:
                 result["error"] = "no M20 data"
                 continue

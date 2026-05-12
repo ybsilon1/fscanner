@@ -6,9 +6,9 @@ Scans 50 forex pairs twice a day (08:00 and 20:00 UTC) via GitHub Actions and se
 
 For each pair the scanner:
 
-1. Fetches yesterday's completed **D1 candle** from Twelve Data in batches of 8 (free-tier limit)
+1. Fetches yesterday's completed **D1 candle** from Twelve Data (one call per pair, 8s apart)
 2. Checks whether the current price is in the **bottom 20% of the D1 range** (the "hot zone")
-3. If yes, fetches the last 12 **M20 candles** (again in batches) and looks for the pattern:
+3. If yes, fetches the last 12 **M20 candles** and looks for the pattern:
    - 3–5 consecutive **red candles**, the last of which has a **lower wick** (≥ 10% of its range)
    - followed immediately by a **green candle**
 4. On a match: sends a **Telegram alert** with a chart image and records the pair as a candidate
@@ -77,9 +77,9 @@ The pipeline runs QA (lint + type-check) first. If QA passes, the scanner runs a
 
 ## API usage
 
-The free Twelve Data plan allows **8 credits/minute** and **800 credits/day**. Each symbol in a batch request costs 1 credit, so the scanner processes pairs in chunks of 8 with a 62-second wait between chunks.
+The free Twelve Data plan allows **8 credits/minute** and **800 credits/day**. The scanner makes one API call per symbol with an 8-second gap between calls.
 
-A full 50-pair D1 scan uses 50 credits (7 chunks). If pairs are in the hot zone, a second M20 batch adds more. Running twice a day uses ~100–150 credits, well within the 800 daily free-tier limit.
+A full 49-pair D1 scan uses 49 credits (~6.5 min). If pairs are in the hot zone, each gets one additional M20 call. Running twice a day uses ~100–150 credits total, well within the 800 daily free-tier limit.
 
 ## Local development
 
