@@ -1,6 +1,6 @@
 # Forex Scanner
 
-Scans 50 forex pairs every hour via GitHub Actions and sends a Telegram alert when a setup matches. Per-run results are published to the [Wiki](../../wiki). Zero hardware needed — runs free on GitHub.
+Scans 50 forex pairs twice a day (08:00 and 20:00 UTC) via GitHub Actions and sends a Telegram alert when a setup matches. Per-run results are published to the [Wiki](../../wiki). Zero hardware needed — runs free on GitHub.
 
 ## How it works
 
@@ -31,7 +31,7 @@ fscanner/
 │   ├── dependabot.yml           # weekly uv (Mon) and Actions (Fri) updates
 │   └── workflows/
 │       ├── qa.yml               # ruff lint + format + ty type-check (push / PR)
-│       └── scanner.yml          # hourly scan — runs qa as a gate, then scans
+│       └── scanner.yml          # twice-daily scan (08:00 + 20:00 UTC) with manual dispatch
 ├── fscanner/
 │   ├── templates/
 │   │   ├── wiki_scan.md         # template for per-run wiki pages
@@ -69,7 +69,7 @@ Telegram is optional — if either variable is missing the scanner skips alerts 
 
 **Settings → Features → Wikis** — must be turned on before the first scan so the Actions runner can clone it.
 
-### 4 — Trigger a first run
+### 3 — Trigger a first run
 
 Go to **Actions → Forex Scanner → Run workflow**.
 
@@ -79,7 +79,7 @@ The pipeline runs QA (lint + type-check) first. If QA passes, the scanner runs a
 
 The free Twelve Data plan allows **8 credits/minute** and **800 credits/day**. Each symbol in a batch request costs 1 credit, so the scanner processes pairs in chunks of 8 with a 62-second wait between chunks.
 
-A full 50-pair D1 scan uses 50 credits (7 chunks). If pairs are in the hot zone, a second M20 batch adds more. Running hourly could exhaust the 800 daily credits — reduce the pair list in [fscanner/scanner.py](fscanner/scanner.py) or upgrade the Twelve Data plan if needed.
+A full 50-pair D1 scan uses 50 credits (7 chunks). If pairs are in the hot zone, a second M20 batch adds more. Running twice a day uses ~100–150 credits, well within the 800 daily free-tier limit.
 
 ## Local development
 
