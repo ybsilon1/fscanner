@@ -47,11 +47,6 @@ jobs:
       - name: Run scanner
         run: uv run fscanner
 
-      - name: Commit docs
-        uses: ./.github/actions/git-push
-        with:
-          message: "scan"
-
       - name: Commit wiki
         if: hashFiles('wiki') != ''
         uses: ./.github/actions/git-push

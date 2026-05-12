@@ -16,10 +16,6 @@ dist/
 .env
 *.env
 
-# Generated output (written by scanner at runtime)
-docs/chart_*.png
-docs/status.json
-
 # Local wiki clone (CI checks out the real GitHub wiki here)
 wiki/
 

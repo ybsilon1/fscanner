@@ -10,12 +10,12 @@ Candidate conditions (ALL must be true):
   3. The candle immediately following those red candles is green
 
 On a match: sends a Telegram alert with a chart image.
-Always writes results to status.json and per-run wiki pages.
+Always writes per-run pages to the GitHub Wiki.
 """
 
 import datetime
-import json
 import os
+import tempfile
 import time
 from pathlib import Path
 from string import Template
@@ -32,7 +32,6 @@ import matplotlib.pyplot as plt
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 _REPO_ROOT = Path(__file__).parent.parent
-DOCS_DIR = _REPO_ROOT / "docs"
 _TEMPLATES = Path(__file__).parent / "templates"
 
 # Free tier: 8 credits/min; each symbol in a batch = 1 credit.
@@ -441,7 +440,7 @@ def generate_chart(
         y=0.98,
     )
 
-    path = DOCS_DIR / f"chart_{symbol.replace('/', '')}.png"
+    path = Path(tempfile.gettempdir()) / f"chart_{symbol.replace('/', '')}.png"
     plt.tight_layout(rect=(0, 0, 1, 0.96))
     plt.savefig(path, dpi=130, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close()
@@ -476,21 +475,6 @@ def send_telegram_alert(
             timeout=20,
         )
     resp.raise_for_status()
-
-
-# ── Status JSON ────────────────────────────────────────────────────────────────
-
-
-def save_status(results: list[dict]):
-    status = {
-        "updated": datetime.datetime.now(datetime.UTC).isoformat(),
-        "scanned": len(results),
-        "candidates": [r for r in results if r.get("candidate")],
-        "all": results,
-    }
-    path = DOCS_DIR / "status.json"
-    path.write_text(json.dumps(status, indent=2))
-    print(f"  Status written → {path}  ({len(status['candidates'])} candidates)")
 
 
 # ── Wiki markdown (for GitHub Wiki) ───────────────────────────────────────────
@@ -606,7 +590,6 @@ def main():
     TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         print("  Telegram not configured — alerts disabled")
-    DOCS_DIR.mkdir(exist_ok=True)
 
     run_dt = datetime.datetime.now(datetime.UTC)
     print(f"=== Forex Scanner  {run_dt.strftime('%Y-%m-%d %H:%M UTC')} ===")
@@ -693,7 +676,6 @@ def main():
 
     # ── Step 4: save outputs ──────────────────────────────────────────────────
     print()
-    save_status(results)
     save_wiki(results, run_dt)
 
     candidates = [r for r in results if r.get("candidate")]

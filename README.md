@@ -6,13 +6,13 @@ Scans 50 forex pairs every hour via GitHub Actions and sends a Telegram alert wh
 
 For each pair the scanner:
 
-1. Fetches yesterday's completed **D1 candle** from Twelve Data
+1. Fetches yesterday's completed **D1 candle** from Twelve Data in batches of 8 (free-tier limit)
 2. Checks whether the current price is in the **bottom 20% of the D1 range** (the "hot zone")
-3. If yes, fetches the last 12 **M20 candles** and looks for the pattern:
+3. If yes, fetches the last 12 **M20 candles** (again in batches) and looks for the pattern:
    - 3–5 consecutive **red candles**, the last of which has a **lower wick** (≥ 10% of its range)
    - followed immediately by a **green candle**
 4. On a match: sends a **Telegram alert** with a chart image and records the pair as a candidate
-5. Writes `docs/status.json`, regenerates `docs/index.md`, and pushes a dated page to the Wiki
+5. Pushes a dated page to the Wiki
 
 ## Candidate conditions (all must be true)
 
@@ -28,14 +28,12 @@ For each pair the scanner:
 fscanner/
 ├── .github/
 │   ├── actions/git-push/        # reusable commit-and-push composite action
+│   ├── dependabot.yml           # weekly uv (Mon) and Actions (Fri) updates
 │   └── workflows/
 │       ├── qa.yml               # ruff lint + format + ty type-check (push / PR)
 │       └── scanner.yml          # hourly scan — runs qa as a gate, then scans
-├── docs/                        # GitHub Pages source
-│   └── index.md                 # app description (served at your Pages URL)
 ├── fscanner/
 │   ├── templates/
-│   │   ├── dashboard.md         # template for docs/index.md (daily report)
 │   │   ├── wiki_scan.md         # template for per-run wiki pages
 │   │   └── wiki_home.md         # template for wiki Home.md (created on first run)
 │   ├── __init__.py
@@ -53,23 +51,21 @@ fscanner/
 | --- | --- |
 | GitHub | hosts code, runs the scanner, serves this page |
 | Twelve Data | forex OHLCV API |
-| Telegram | receives alerts on your phone |
+| Telegram | receives alerts on your phone (optional) |
 
 ### 1 — Add GitHub Secrets
 
 Go to **Settings → Secrets and variables → Actions → New repository secret** and add:
 
-| Secret | Where to get it |
-| --- | --- |
-| `TWELVE_DATA_KEY` | [twelvedata.com](https://twelvedata.com) → dashboard → API key |
-| `TELEGRAM_TOKEN` | Telegram → @BotFather → `/newbot` |
-| `TELEGRAM_CHAT_ID` | Send any message to your bot, then call `https://api.telegram.org/bot<TOKEN>/getUpdates` and read `result[0].message.chat.id` |
+| Secret | Required | Where to get it |
+| --- | --- | --- |
+| `TWELVE_DATA_KEY` | yes | [twelvedata.com](https://twelvedata.com) → dashboard → API key |
+| `TELEGRAM_TOKEN` | no | Telegram → @BotFather → `/newbot` |
+| `TELEGRAM_CHAT_ID` | no | Send any message to your bot, then call `https://api.telegram.org/bot<TOKEN>/getUpdates` and read `result[0].message.chat.id` |
 
-### 2 — Enable GitHub Pages
+Telegram is optional — if either variable is missing the scanner skips alerts but still writes results to the wiki.
 
-**Settings → Pages → Source: Deploy from branch → Branch: `main`, Folder: `/docs`**
-
-### 3 — Enable the Wiki
+### 2 — Enable the Wiki
 
 **Settings → Features → Wikis** — must be turned on before the first scan so the Actions runner can clone it.
 
@@ -77,16 +73,13 @@ Go to **Settings → Secrets and variables → Actions → New repository secret
 
 Go to **Actions → Forex Scanner → Run workflow**.
 
-The pipeline runs QA (lint + type-check) first. If QA passes, the scanner runs and commits results to `docs/` and the wiki.
+The pipeline runs QA (lint + type-check) first. If QA passes, the scanner runs and commits results to the wiki.
 
 ## API usage
 
-The free Twelve Data plan allows **800 requests/day**. A full 50-pair scan uses ~150 requests (3 calls per pair). Running hourly = ~3,600 requests/day, which exceeds the free limit.
+The free Twelve Data plan allows **8 credits/minute** and **800 credits/day**. Each symbol in a batch request costs 1 credit, so the scanner processes pairs in chunks of 8 with a 62-second wait between chunks.
 
-Options:
-
-- **Upgrade** to a paid Twelve Data plan
-- **Reduce the pair list** in [fscanner/scanner.py](fscanner/scanner.py) — 26 pairs fits within the free quota at hourly frequency
+A full 50-pair D1 scan uses 50 credits (7 chunks). If pairs are in the hot zone, a second M20 batch adds more. Running hourly could exhaust the 800 daily credits — reduce the pair list in [fscanner/scanner.py](fscanner/scanner.py) or upgrade the Twelve Data plan if needed.
 
 ## Local development
 
@@ -99,6 +92,16 @@ uv run ruff check fscanner/
 uv run ruff format --check fscanner/
 uv run ty check fscanner/
 
-# Run the scanner (requires env vars)
-TWELVE_DATA_KEY=... TELEGRAM_TOKEN=... TELEGRAM_CHAT_ID=... uv run fscanner
+# Run the scanner (loads credentials from .env)
+uv run --env-file .env fscanner
+```
+
+The `.env` file is gitignored. Copy the example and fill in your key:
+
+```bash
+TWELVE_DATA_KEY=your_key_here
+
+# Optional — leave blank to disable Telegram alerts
+TELEGRAM_TOKEN=
+TELEGRAM_CHAT_ID=
 ```
