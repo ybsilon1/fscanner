@@ -5,7 +5,7 @@ on:
     - cron: "0 6 * * *"   # post-market Asia   
     - cron: "0 8 * * *"   # opening London
     - cron: "0 13 * * *"  # opening NY
-      workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   scan:
