@@ -2,8 +2,8 @@ name: Forex Scanner
 
 on:
   schedule:
-    - cron: "0 8 * * *"
-    - cron: "0 20 * * *"
+    - cron: "0 7 * * *"   # 08:00 CET (UTC+1); 09:00 in summer (CEST)
+    - cron: "0 19 * * *"  # 20:00 CET (UTC+1); 21:00 in summer (CEST)
   workflow_dispatch:
 
 jobs:

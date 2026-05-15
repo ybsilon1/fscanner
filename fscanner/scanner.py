@@ -34,8 +34,8 @@ import matplotlib.pyplot as plt
 _REPO_ROOT = Path(__file__).parent.parent
 _TEMPLATES = Path(__file__).parent / "templates"
 
-_CALL_INTERVAL = 8.0  # free tier: 8 credits/min → 1 call per 8s
-_next_call_allowed: float = 0.0  # monotonic timestamp; 0 means "immediately"
+_RATE_LIMIT = 7  # max calls allowed per 60-second window (free tier is 8; keep one spare)
+_call_times: list[float] = []  # monotonic timestamps of recent calls
 
 TWELVE_DATA_KEY = None
 TELEGRAM_TOKEN = None
@@ -112,22 +112,34 @@ PAIRS = [
 # ── Twelve Data helpers ────────────────────────────────────────────────────────
 
 
+def _rate_limit_wait() -> None:
+    """Block until sending the next request would not exceed _RATE_LIMIT calls per 60 s."""
+    while True:
+        now = time.monotonic()
+        # Drop timestamps outside the 60-second window
+        cutoff = now - 60.0
+        while _call_times and _call_times[0] <= cutoff:
+            _call_times.pop(0)
+        if len(_call_times) < _RATE_LIMIT:
+            return
+        # Window is full — sleep until the oldest call ages out
+        wait = _call_times[0] - cutoff
+        print(f"  rate-limit: waiting {wait:.0f}s...")
+        time.sleep(wait)
+
+
 def api_get(endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
-    global _next_call_allowed
     params["apikey"] = TWELVE_DATA_KEY
     for attempt in range(3):
-        wait = _next_call_allowed - time.monotonic()
-        if wait > 0:
-            print(f"  rate-limit: waiting {wait:.0f}s...")
-            time.sleep(wait)
+        _rate_limit_wait()
         try:
-            _next_call_allowed = time.monotonic() + _CALL_INTERVAL
+            _call_times.append(time.monotonic())
             r = requests.get(f"https://api.twelvedata.com/{endpoint}", params=params, timeout=30)
             r.raise_for_status()
             data = r.json()
             if data.get("code") == 429:
                 print(f"  429 rate-limited (attempt {attempt + 1}), retrying in 65s...")
-                _next_call_allowed = time.monotonic() + 65
+                time.sleep(65)
                 continue
             return data
         except Exception as e:
