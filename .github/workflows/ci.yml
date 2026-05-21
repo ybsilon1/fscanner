@@ -53,7 +53,7 @@ jobs:
           fi
       - name: Run pytest
         run: |
-          uv run pytest tests/ -vv --cov=run --cov-report=json
+          uv run pytest tests/ -vv --cov=fscanner --cov-report=json
       - name: Generate coverage summary
         run: |
           echo "### Python ${{ matrix.python-version }} coverage" >> $GITHUB_STEP_SUMMARY
