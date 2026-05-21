@@ -1,10 +1,7 @@
 """Unit tests for fscanner.scanner."""
 
 import datetime
-import os
-import tempfile
 import time
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
