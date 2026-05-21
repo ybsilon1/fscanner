@@ -59,7 +59,13 @@ def test_require_env_empty_string(monkeypatch):
 
 
 def test_parse_candle_converts_strings():
-    raw = {"datetime": "2026-05-11 00:00:00", "open": "1.1000", "high": "1.1100", "low": "1.0900", "close": "1.1050"}
+    raw = {
+        "datetime": "2026-05-11 00:00:00",
+        "open": "1.1000",
+        "high": "1.1100",
+        "low": "1.0900",
+        "close": "1.1050",
+    }
     c = scanner._parse_candle(raw)
     assert c["datetime"] == "2026-05-11 00:00:00"
     assert c["open"] == 1.1000
@@ -182,7 +188,9 @@ def test_has_lower_wick_green_candle():
 def _dts(n: int) -> list[str]:
     """Generate n sequential datetime strings 20 minutes apart."""
     base = datetime.datetime(2026, 5, 11, 8, 0)
-    return [(base + datetime.timedelta(minutes=20 * i)).strftime("%Y-%m-%d %H:%M:%S") for i in range(n)]
+    return [
+        (base + datetime.timedelta(minutes=20 * i)).strftime("%Y-%m-%d %H:%M:%S") for i in range(n)
+    ]
 
 
 def make_m20_with_pattern(streak_len: int) -> list[dict]:
@@ -280,8 +288,20 @@ def test_get_d1_returns_tuple(monkeypatch):
         lambda *a, **kw: {
             "status": "ok",
             "values": [
-                {"datetime": "2026-05-12", "open": "1.1", "high": "1.12", "low": "1.09", "close": "1.105"},
-                {"datetime": "2026-05-11", "open": "1.09", "high": "1.11", "low": "1.08", "close": "1.10"},
+                {
+                    "datetime": "2026-05-12",
+                    "open": "1.1",
+                    "high": "1.12",
+                    "low": "1.09",
+                    "close": "1.105",
+                },
+                {
+                    "datetime": "2026-05-11",
+                    "open": "1.09",
+                    "high": "1.11",
+                    "low": "1.08",
+                    "close": "1.10",
+                },
             ],
         },
     )
@@ -307,7 +327,15 @@ def test_get_d1_returns_none_if_only_one_value(monkeypatch):
         scanner,
         "api_get",
         lambda *a, **kw: {
-            "values": [{"datetime": "2026-05-12", "open": "1.1", "high": "1.12", "low": "1.09", "close": "1.105"}]
+            "values": [
+                {
+                    "datetime": "2026-05-12",
+                    "open": "1.1",
+                    "high": "1.12",
+                    "low": "1.09",
+                    "close": "1.105",
+                }
+            ]
         },
     )
     assert scanner.get_d1("EUR/USD") is None
@@ -315,7 +343,13 @@ def test_get_d1_returns_none_if_only_one_value(monkeypatch):
 
 def test_get_m20_returns_list(monkeypatch):
     raw_values = [
-        {"datetime": f"2026-05-11 0{i}:00:00", "open": "1.1", "high": "1.11", "low": "1.09", "close": "1.105"}
+        {
+            "datetime": f"2026-05-11 0{i}:00:00",
+            "open": "1.1",
+            "high": "1.11",
+            "low": "1.09",
+            "close": "1.105",
+        }
         for i in range(13)
     ]
     monkeypatch.setattr(scanner, "api_get", lambda *a, **kw: {"values": raw_values})
@@ -334,7 +368,15 @@ def test_get_m20_returns_none_if_too_few(monkeypatch):
         scanner,
         "api_get",
         lambda *a, **kw: {
-            "values": [{"datetime": "2026-05-11", "open": "1.1", "high": "1.11", "low": "1.09", "close": "1.1"}]
+            "values": [
+                {
+                    "datetime": "2026-05-11",
+                    "open": "1.1",
+                    "high": "1.11",
+                    "low": "1.09",
+                    "close": "1.1",
+                }
+            ]
         },
     )
     assert scanner.get_m20("EUR/USD") is None
@@ -426,14 +468,32 @@ def test_all_pairs_table_no_pattern():
 
 def test_build_wiki_page_filename_format():
     run_dt = datetime.datetime(2026, 5, 12, 9, 10, tzinfo=datetime.timezone.utc)
-    results = [{"symbol": "EUR/USD", "candidate": False, "error": None, "price": 1.09, "pct_from_low": 30.0, "pattern": None}]
+    results = [
+        {
+            "symbol": "EUR/USD",
+            "candidate": False,
+            "error": None,
+            "price": 1.09,
+            "pct_from_low": 30.0,
+            "pattern": None,
+        }
+    ]
     page_name, content = scanner.build_wiki_page(results, run_dt)
     assert page_name == "Scan-2026-05-12-0910"
 
 
 def test_build_wiki_page_contains_timestamp():
     run_dt = datetime.datetime(2026, 5, 12, 9, 10, tzinfo=datetime.timezone.utc)
-    results = [{"symbol": "EUR/USD", "candidate": False, "error": None, "price": 1.09, "pct_from_low": 30.0, "pattern": None}]
+    results = [
+        {
+            "symbol": "EUR/USD",
+            "candidate": False,
+            "error": None,
+            "price": 1.09,
+            "pct_from_low": 30.0,
+            "pattern": None,
+        }
+    ]
     _, content = scanner.build_wiki_page(results, run_dt)
     assert "2026-05-12 09:10 UTC" in content
 
@@ -449,7 +509,14 @@ def test_build_wiki_page_candidate_count():
         "d1": make_candle(low=1.0900, high=1.1100),
         "pattern": {"streak_len": 3},
     }
-    non_candidate = {"symbol": "USD/JPY", "candidate": False, "error": None, "price": 154.0, "pct_from_low": 50.0, "pattern": None}
+    non_candidate = {
+        "symbol": "USD/JPY",
+        "candidate": False,
+        "error": None,
+        "price": 154.0,
+        "pct_from_low": 50.0,
+        "pattern": None,
+    }
     _, content = scanner.build_wiki_page([candidate, non_candidate], run_dt)
     assert "1 candidate" in content
 
@@ -459,7 +526,9 @@ def test_build_wiki_page_candidate_count():
 
 def test_update_wiki_index_creates_row(tmp_path):
     home = tmp_path / "Home.md"
-    home.write_text("# Forex Scanner — Scan History\n\n| Run | Candidates | Pairs scanned |\n| --- | --- | --- |\n")
+    home.write_text(
+        "# Forex Scanner — Scan History\n\n| Run | Candidates | Pairs scanned |\n| --- | --- | --- |\n"
+    )
     run_dt = datetime.datetime(2026, 5, 12, 9, 10, tzinfo=datetime.timezone.utc)
     scanner.update_wiki_index(tmp_path, "Scan-2026-05-12-0910", run_dt, 2, 49)
     content = home.read_text()
@@ -509,7 +578,16 @@ def test_save_wiki_writes_page(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(scanner, "_REPO_ROOT", tmp_path)
     run_dt = datetime.datetime(2026, 5, 12, 9, 10, tzinfo=datetime.timezone.utc)
-    results = [{"symbol": "EUR/USD", "candidate": False, "error": None, "price": 1.09, "pct_from_low": 30.0, "pattern": None}]
+    results = [
+        {
+            "symbol": "EUR/USD",
+            "candidate": False,
+            "error": None,
+            "price": 1.09,
+            "pct_from_low": 30.0,
+            "pattern": None,
+        }
+    ]
     scanner.save_wiki(results, run_dt)
     assert (wiki_dir / "Scan-2026-05-12-0910.md").exists()
 

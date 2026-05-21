@@ -1,0 +1,71 @@
+name: QA
+
+on:
+  push:
+    branches-ignore: ["main"]
+  pull_request:
+  workflow_call:
+
+jobs:
+  code-qa:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint (ruff)
+        run: uv run ruff check fscanner/
+
+      - name: Type check (ty)
+        run: uv run ty check fscanner/
+
+  tests:
+    name: Testing plugin
+    needs: code-qa
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Dev dependencies
+        run: |
+          pip install uv
+          uv sync
+      - name: "Set environment variables"
+        run: |
+          RUNNER_NAME=$(echo "${{ runner.name }}" | grep -o 'ghrunner[0-9]\+' | sed 's/ghrunner\([0-9]\+\)/ghrunner_\1/')
+          if [ -n "$RUNNER_NAME" ]; then
+            echo "PYTEST_DEBUG_TEMPROOT=/var/lib/github/${RUNNER_NAME}/_temp" >> $GITHUB_ENV
+          fi
+      - name: Run pytest
+        run: |
+          uv run pytest tests/ -vv --cov=run --cov-report=json
+      - name: Generate coverage summary
+        run: |
+          echo "### Python ${{ matrix.python-version }} coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Total Statements | Covered | Missing | Coverage |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
+          jq -r '"| \(.totals.num_statements) | \(.totals.covered_lines) | \(.totals.missing_lines) | \(.totals.percent_covered_display)% |"' \
+            coverage.json >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          COVERAGE=$(jq -r '.totals.percent_covered_display' coverage.json)
+          if (( $(echo "$COVERAGE > 75" | bc -l) )); then
+            echo "![Coverage](https://img.shields.io/badge/Coverage-$COVERAGE%25-brightgreen)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "![Coverage](https://img.shields.io/badge/Coverage-$COVERAGE%25-yellow)" >> $GITHUB_STEP_SUMMARY
+          fi
