@@ -92,9 +92,32 @@ uv run ruff check fscanner/
 uv run ruff format --check fscanner/
 uv run ty check fscanner/
 
+# Run tests
+uv run pytest
+
 # Run the scanner (loads credentials from .env)
 uv run --env-file .env fscanner
 ```
+
+## Tests
+
+Tests live in `tests/test_scanner.py` and cover all pure-logic functions in `fscanner/scanner.py`. External I/O (HTTP calls, file writes) is patched with `monkeypatch` and `unittest.mock`.
+
+| Area | What is tested |
+| --- | --- |
+| `_require_env` | present, missing, empty-string |
+| `_parse_candle` | string-to-float coercion, pass-through floats |
+| `in_hot_zone` | at low, at 20% boundary, above zone, below low, zero-range candle, pct rounding |
+| `is_red` / `is_green` | bearish, bullish, doji (equal close = green) |
+| `has_lower_wick` | exact 10% threshold, below threshold, zero-range candle, custom `min_wick_pct`, green body |
+| `find_pattern` | streaks of 3, 4, 5; longest-streak preference; no wick on last red; too few candles; non-contiguous streak; return field correctness |
+| `get_d1` / `get_m20` | successful response, API error, empty response, too few values |
+| `_candidates_section` | empty list, single candidate, chart-link toggle |
+| `_all_pairs_table` | error row, candidate row, non-candidate row |
+| `build_wiki_page` | filename format, timestamp, candidate count |
+| `update_wiki_index` | inserts row, prepends before existing rows, creates `Home.md` from template |
+| `save_wiki` | skips gracefully when wiki dir absent, writes page file |
+| `api_get` | success path, all-attempts exhausted, 429 retry loop |
 
 The `.env` file is gitignored. Copy the example and fill in your key:
 
