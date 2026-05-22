@@ -68,10 +68,6 @@ PAIRS = [
     "USD/NOK",
     "USD/SEK",
     "USD/NZD",
-    "USD/INR",
-    "USD/KRW",
-    # Major crosses
-    "EUR/GBP",
     "EUR/JPY",
     "EUR/CHF",
     "EUR/CAD",
@@ -92,22 +88,7 @@ PAIRS = [
     "CAD/JPY",
     "CAD/CHF",
     "CHF/JPY",
-    # Minors & exotics
-    "USD/TRY",
-    "USD/ZAR",
-    "USD/BRL",
-    "USD/PLN",
-    "USD/CZK",
-    "USD/HUF",
-    "USD/DKK",
-    "USD/THB",
-    "USD/MYR",
-    "USD/PHP",
-    "EUR/PLN",
-    "EUR/TRY",
-    "EUR/ZAR",
-    "GBP/PLN",
-]
+    ]
 
 # ── Twelve Data helpers ────────────────────────────────────────────────────────
 
