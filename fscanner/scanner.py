@@ -148,14 +148,14 @@ def get_d1(symbol: str) -> tuple[dict, float] | None:
     values = data["values"]
     return (_parse_candle(values[1]), float(values[0]["close"])) if len(values) >= 2 else None
 
-
-def get_m20(symbol: str, count: int = 12) -> list[dict] | None:
-    """Fetch the last `count` completed M20 candles for one symbol."""
-    data = api_get("time_series", {"symbol": symbol, "interval": "20min", "outputsize": count + 1})
-    if data.get("status") == "error" or "values" not in data:
-        return None
-    raw = data["values"]
-    return [_parse_candle(c) for c in reversed(raw[1:])] if len(raw) >= 2 else None
+#removing the m20
+#def get_m20(symbol: str, count: int = 12) -> list[dict] | None:
+#    """Fetch the last `count` completed M20 candles for one symbol."""
+#   data = api_get("time_series", {"symbol": symbol, "interval": "20min", "outputsize": count + 1})
+#    if data.get("status") == "error" or "values" not in data:
+#        return None
+#    raw = data["values"]
+#    return [_parse_candle(c) for c in reversed(raw[1:])] if len(raw) >= 2 else None
 
 
 # ── Signal detection ───────────────────────────────────────────────────────────
@@ -171,60 +171,60 @@ def in_hot_zone(price: float, d1: dict) -> tuple[bool, float]:
     return price >= d1["low"] and price <= zone_top, round(pct, 1)
 
 
-def is_red(c: dict) -> bool:
-    return c["close"] < c["open"]
+#def is_red(c: dict) -> bool:
+#    return c["close"] < c["open"]
 
 
-def is_green(c: dict) -> bool:
-    return c["close"] >= c["open"]
+#def is_green(c: dict) -> bool:
+#    return c["close"] >= c["open"]
 
 
-def has_lower_wick(c: dict, min_wick_pct: float = 0.1) -> bool:
-    """Lower wick must be at least min_wick_pct of the candle range."""
-    body_bottom = min(c["open"], c["close"])
-    candle_range = c["high"] - c["low"]
-    if candle_range == 0:
-        return False
-    wick = body_bottom - c["low"]
-    return wick / candle_range >= min_wick_pct
+#def has_lower_wick(c: dict, min_wick_pct: float = 0.1) -> bool:
+#    """Lower wick must be at least min_wick_pct of the candle range."""
+#    body_bottom = min(c["open"], c["close"])
+#    candle_range = c["high"] - c["low"]
+#    if candle_range == 0:
+#        return False
+#    wick = body_bottom - c["low"]
+#    return wick / candle_range >= min_wick_pct
 
 
-def find_pattern(m20: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """Scan for: green candle preceded by 3–5 red candles, last red has lower wick.
-
-    Checks longest streak first (5 → 3) so the strongest signal is preferred.
-    """
-    if len(m20) < 4:
-        return None
-
-    last = m20[-1]
-    if not is_green(last):
-        return None
-
-    for streak_len in range(5, 2, -1):  # prefer longest streak
-        end_idx = len(m20) - 2
-        start_idx = end_idx - streak_len + 1
-        if start_idx < 0:
-            continue
-
-        streak = m20[start_idx : end_idx + 1]
-
-        if not all(is_red(c) for c in streak):
-            continue
-
-        last_red = streak[-1]
-        if not has_lower_wick(last_red):
-            continue
-
-        return {
-            "streak_len": streak_len,
-            "streak_start": streak[0]["datetime"],
-            "last_red": last_red,
-            "green_candle": last,
-        }
-
-    return None
-
+#def find_pattern(m20: list[dict[str, Any]]) -> dict[str, Any] | None:
+#    """Scan for: green candle preceded by 3–5 red candles, last red has lower wick.
+#
+#    Checks longest streak first (5 → 3) so the strongest signal is preferred.
+#   """
+#    if len(m20) < 4:
+#        return None
+#
+#    last = m20[-1]
+#    if not is_green(last):
+#        return None
+#
+#    for streak_len in range(5, 2, -1):  # prefer longest streak
+#        end_idx = len(m20) - 2
+#        start_idx = end_idx - streak_len + 1
+#        if start_idx < 0:
+#            continue
+#
+#        streak = m20[start_idx : end_idx + 1]
+#
+#        if not all(is_red(c) for c in streak):
+#            continue
+#
+#        last_red = streak[-1]
+#        if not has_lower_wick(last_red):
+#            continue
+#
+#        return {
+#            "streak_len": streak_len,
+#            "streak_start": streak[0]["datetime"],
+#            "last_red": last_red,
+#            "green_candle": last,
+#        }
+#
+#    return None
+#
 
 # ── Chart generation ───────────────────────────────────────────────────────────
 
